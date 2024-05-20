@@ -129,13 +129,9 @@ case class InsertIntoHiveTable(
       tmpLocation: Path,
       child: SparkPlan): Unit = {
 
-    val numDynamicPartitions = partition.values.count(_.isEmpty)
-    val partitionSpec = getPartitionSpec(partition)
+    var checkMaxDynamicPartitions = false
     if (overwrite && table.tableType == CatalogTableType.EXTERNAL) {
-      val maxDynamicPartitionsKey = HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS.varname
-      val maxDynamicPartitions = hadoopConf.getInt(maxDynamicPartitionsKey,
-        HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS.defaultIntVal)
-      options ++ Map("maxDynamicPartitions" -> String.valueOf(maxDynamicPartitions))
+      checkMaxDynamicPartitions = true
     }
 
     val writtenParts = saveAsHiveFile(
@@ -146,7 +142,14 @@ case class InsertIntoHiveTable(
       outputLocation = tmpLocation.toString,
       partitionAttributes = partitionColumns,
       bucketSpec = bucketSpec,
-      options = options)
+      options = if (overwrite && table.tableType == CatalogTableType.EXTERNAL) {
+        val maxDynamicPartitionsKey = HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS.varname
+        val maxDynamicPartitions = hadoopConf.getInt(maxDynamicPartitionsKey,
+          HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS.defaultIntVal)
+        options ++ Map("maxDynamicPartitions" -> String.valueOf(maxDynamicPartitions))
+      } else {
+        options
+      })
 
     if (partition.nonEmpty) {
       if (numDynamicPartitions > 0) {

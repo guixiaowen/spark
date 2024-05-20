@@ -58,7 +58,8 @@ private[hive] trait SaveAsHiveFile extends DataWritingCommand {
       partitionColumns = partitionAttributes,
       bucketSpec = bucketSpec,
       statsTrackers = Seq(basicWriteJobStatsTracker(hadoopConf)),
-      options = options)
+      options = options
+    )
   }
 }
 

@@ -17,10 +17,9 @@
 package org.apache.spark.sql.execution.datasources
 
 import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.mapreduce.TaskAttemptContext
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.io.{FileCommitProtocol, FileNameSpec}
 import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
@@ -29,6 +28,7 @@ import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
 import org.apache.spark.sql.catalyst.catalog.ExternalCatalogUtils
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
+import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.datasources.FileFormatWriter.ConcurrentOutputWriterSpec
 import org.apache.spark.sql.execution.metric.{CustomMetrics, SQLMetric}
 import org.apache.spark.sql.internal.SQLConf
@@ -346,6 +346,8 @@ class DynamicPartitionDataSingleWriter(
 
   private var currentPartitionValues: Option[UnsafeRow] = None
   private var currentBucketId: Option[Int] = None
+  private val maxDynamicPartitions: Int = description.maxDynamicPartitions
+  private val concurrentWriters = mutable.HashMap[Option[UnsafeRow], Option[UnsafeRow]]()
 
   override def write(record: InternalRow): Unit = {
     val nextPartitionValues = if (isPartitioned) Some(getPartitionValues(record)) else None
@@ -356,6 +358,14 @@ class DynamicPartitionDataSingleWriter(
       if (isPartitioned && currentPartitionValues != nextPartitionValues) {
         currentPartitionValues = Some(nextPartitionValues.get.copy())
         statsTrackers.foreach(_.newPartition(currentPartitionValues.get))
+        if (maxDynamicPartitions > 0 && !concurrentWriters.contains(nextPartitionValues)) {
+          concurrentWriters.put(nextPartitionValues, nextPartitionValues)
+          if (concurrentWriters.size > maxDynamicPartitions) {
+            throw QueryExecutionErrors.
+              writePartitionExceedConfigSizeWhenDynamicPartitionPerTaskError(
+              maxDynamicPartitions, "max partition num")
+          }
+        }
       }
       if (isBucketed) {
         currentBucketId = nextBucketId
@@ -585,7 +595,8 @@ class WriteJobDescription(
     val customPartitionLocations: Map[TablePartitionSpec, String],
     val maxRecordsPerFile: Long,
     val timeZoneId: String,
-    val statsTrackers: Seq[WriteJobStatsTracker])
+    val statsTrackers: Seq[WriteJobStatsTracker],
+    val maxDynamicPartitions: Int = 0)
   extends Serializable {
 
   assert(AttributeSet(allColumns) == AttributeSet(partitionColumns ++ dataColumns),

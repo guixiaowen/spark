@@ -2678,6 +2678,18 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase {
       cause = null)
   }
 
+  def writePartitionExceedConfigSizeWhenDynamicPartitionPerTaskError(
+     maxDynamicPartitions: Int,
+     maxDynamicPartitionsKey: String): Throwable = {
+    new SparkException(
+      errorClass = "_LEGACY_ERROR_TEMP_BY_TASK_2277",
+      messageParameters = Map(
+        "maxDynamicPartitionsKey" -> maxDynamicPartitionsKey,
+        "maxDynamicPartitions" -> maxDynamicPartitions.toString),
+      cause = null)
+  }
+
+
   def invalidNumberFormatError(
       valueType: String, input: String, format: String): SparkIllegalArgumentException = {
     new SparkIllegalArgumentException(
