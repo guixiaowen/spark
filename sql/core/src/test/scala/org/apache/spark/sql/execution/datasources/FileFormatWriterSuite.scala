@@ -65,6 +65,20 @@ class FileFormatWriterSuite
     }
   }
 
+  test("test 1") {
+    withTable("t1", "t2") {
+      Seq((0, "p1"), (1, "p2"), (2, "p3")).toDF("id", "p")
+        .write.partitionBy("p").saveAsTable("t1")
+      checkAnswer(spark.table("t1").sort("id"), Seq(Row(0, "p1"), Row(1, "p2"), Row(2, "p3")))
+      withTempDir { tempDir =>
+        sql(s"create table t2(id long, p string) using parquet " +
+          s"partitioned by (p) location '${tempDir.toURI}'")
+        sql("set hive.exec.max.dynamic.partitions=2")
+        sql("insert overwrite table t2 partition(p) select id, p from t1")
+      }
+    }
+  }
+
   test("SPARK-33904: save and insert into a table in a namespace of spark_catalog") {
     val ns = "spark_catalog.ns"
     withNamespace(ns) {
