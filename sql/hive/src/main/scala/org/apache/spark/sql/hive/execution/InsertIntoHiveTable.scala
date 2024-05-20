@@ -131,6 +131,12 @@ case class InsertIntoHiveTable(
 
     val numDynamicPartitions = partition.values.count(_.isEmpty)
     val partitionSpec = getPartitionSpec(partition)
+    if (overwrite && table.tableType == CatalogTableType.EXTERNAL) {
+      val maxDynamicPartitionsKey = HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS.varname
+      val maxDynamicPartitions = hadoopConf.getInt(maxDynamicPartitionsKey,
+        HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS.defaultIntVal)
+      options ++ Map("maxDynamicPartitions" -> String.valueOf(maxDynamicPartitions))
+    }
 
     val writtenParts = saveAsHiveFile(
       sparkSession = sparkSession,
