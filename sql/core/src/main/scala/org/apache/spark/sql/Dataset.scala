@@ -1451,7 +1451,23 @@ class Dataset[T] private[sql](
     plan.executeCollect().head.getLong(0)
   }
 
-  /** @inheritdoc */
+  def rebalance(): Dataset[T] = withTypedPlan {
+    RebalancePartitions(null, logicalPlan)
+  }
+
+  def rebalance(numPartitions: Int): Dataset[T] = withTypedPlan {
+    RebalancePartitions(null, logicalPlan, Some(numPartitions))
+  }
+
+  def rebalance(partitionExprs: Column*): Dataset[T] = withTypedPlan {
+    RebalancePartitions(partitionExprs.map(_.expr), logicalPlan)
+  }
+
+  def rebalance(numPartitions: Int, partitionExprs: Column*): Dataset[T] = withTypedPlan {
+    RebalancePartitions(partitionExprs.map(_.expr), logicalPlan, Some(numPartitions))
+  }
+
+    /** @inheritdoc */
   def repartition(numPartitions: Int): Dataset[T] = withTypedPlan {
     Repartition(numPartitions, shuffle = true, logicalPlan)
   }
