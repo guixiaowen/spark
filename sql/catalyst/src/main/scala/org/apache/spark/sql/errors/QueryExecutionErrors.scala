@@ -1064,10 +1064,11 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map("ddl" -> ddl))
   }
 
-  def executeBroadcastTimeoutError(timeout: Long, ex: Option[TimeoutException]): Throwable = {
+  def executeBroadcastTimeoutError(timeout: Long, tables: String, ex: Option[TimeoutException]): Throwable = {
     new SparkException(
       errorClass = "_LEGACY_ERROR_TEMP_2097",
       messageParameters = Map(
+        "tableName" -> tables,
         "timeout" -> timeout.toString(),
         "broadcastTimeout" -> toSQLConf(SQLConf.BROADCAST_TIMEOUT.key),
         "autoBroadcastJoinThreshold" -> toSQLConf(SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key)),
